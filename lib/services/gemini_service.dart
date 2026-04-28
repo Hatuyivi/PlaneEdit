@@ -7,7 +7,14 @@ import '../utils/douglas_peucker.dart';
 
 class GeminiService {
   static const String _baseUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+      'https://generativelanguage.googleapis.com/v1beta/models';
+
+  static const List<String> _models = [
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+    'gemini-1.5-pro',
+  ];
 
   final String apiKey;
 
@@ -53,53 +60,55 @@ Rules:
       'contents': [
         {
           'parts': [
-            {
-              'inline_data': {
-                'mime_type': mimeType,
-                'data': base64Image,
-              }
-            },
+            {'inline_data': {'mime_type': mimeType, 'data': base64Image}},
             {'text': prompt},
           ]
         }
       ],
-      'generationConfig': {
-        'temperature': 0.1,
-        'maxOutputTokens': 4096,
-      }
+      'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 4096},
     });
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl?key=$apiKey'),
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
+    String? lastError;
 
-    if (response.statusCode != 200) {
-      throw Exception('Gemini API error ${response.statusCode}: ${response.body}');
+    for (final model in _models) {
+      try {
+        final response = await http.post(
+          Uri.parse('$_baseUrl/$model:generateContent?key=$apiKey'),
+          headers: {'Content-Type': 'application/json'},
+          body: body,
+        );
+
+        if (response.statusCode == 429 || response.statusCode == 503) {
+          lastError = 'Model $model unavailable (${response.statusCode}), trying next...';
+          continue;
+        }
+
+        if (response.statusCode != 200) {
+          lastError = 'Model $model error ${response.statusCode}: ${response.body}';
+          continue;
+        }
+
+        final data = jsonDecode(response.body);
+        final text = data['candidates'][0]['content']['parts'][0]['text'] as String;
+        final cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
+        final parsed = jsonDecode(cleaned);
+        final roomsJson = parsed['rooms'] as List<dynamic>;
+
+        return roomsJson.map((r) {
+          final name = r['name'] as String;
+          final rawPoints = (r['polygon'] as List<dynamic>)
+              .map((p) => Offset((p[0] as num).toDouble(), (p[1] as num).toDouble()))
+              .toList();
+          final smoothed = DouglasPeucker.simplify(rawPoints, smoothingEpsilon);
+          return Room(name: name, polygon: rawPoints, smoothedPolygon: smoothed);
+        }).toList();
+
+      } catch (e) {
+        lastError = 'Model $model exception: $e';
+        continue;
+      }
     }
 
-    final data = jsonDecode(response.body);
-    final text = data['candidates'][0]['content']['parts'][0]['text'] as String;
-
-    // Strip possible markdown fences
-    final cleaned = text
-        .replaceAll('```json', '')
-        .replaceAll('```', '')
-        .trim();
-
-    final parsed = jsonDecode(cleaned);
-    final roomsJson = parsed['rooms'] as List<dynamic>;
-
-    return roomsJson.map((r) {
-      final name = r['name'] as String;
-      final rawPoints = (r['polygon'] as List<dynamic>)
-          .map((p) => Offset((p[0] as num).toDouble(), (p[1] as num).toDouble()))
-          .toList();
-
-      final smoothed = DouglasPeucker.simplify(rawPoints, smoothingEpsilon);
-
-      return Room(name: name, polygon: rawPoints, smoothedPolygon: smoothed);
-    }).toList();
+    throw Exception('All models failed. Last error: $lastError');
   }
 }
