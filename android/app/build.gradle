@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace "com.example.floor_plan_app"
-    compileSdk 34
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.example.floor_plan_app"
