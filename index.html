@@ -50,6 +50,7 @@
   #file-input { display: none; }
   .spinner { width: 16px; height: 16px; border: 2px solid #ffffff40; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  #json-box { display:none; background:#ffffff08; border-radius:8px; padding:12px; font-size:11px; color:#ffffffaa; white-space:pre-wrap; word-break:break-all; max-height:300px; overflow-y:auto; font-family:monospace; }
 </style>
 </head>
 <body>
@@ -89,11 +90,13 @@
     <div class="btn-row">
       <button class="btn" id="detect-btn" onclick="detectRooms()">✨ Detect Rooms</button>
       <button class="btn btn-outline" onclick="toggleLabels()">Toggle Labels</button>
-      <button class="btn btn-outline" onclick="clearRooms()">Clear</button><button class="btn btn-outline" onclick="toggleJson()">Show JSON</button>
+      <button class="btn btn-outline" onclick="clearRooms()">Clear</button>
+      <button class="btn btn-outline" onclick="toggleJson()">Show JSON</button>
     </div>
     <div id="rooms-row" class="rooms-row"></div>
+    <div id="json-box"></div>
     <div id="error-box" style="display:none" class="error"></div>
-    <pre id="json-box" style="display:none;background:#ffffff08;border-radius:8px;padding:12px;font-size:11px;color:#ffffffaa;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto"></pre><div id="status" class="status"></div>
+    <div id="status" class="status"></div>
   </div>
 </div>
 
@@ -103,6 +106,7 @@ const MODELS = ['gemini-2.5-flash-preview-05-20', 'gemini-2.5-flash-lite'];
 let apiKeys = [];
 let img = null, rooms = [], selectedIndex = null, showLabels = true;
 let imgNaturalW = 0, imgNaturalH = 0;
+let lastRawJson = null;
 
 function loadKeys() {
   try { apiKeys = JSON.parse(localStorage.getItem('gemini_keys') || '[]'); } catch { apiKeys = []; }
@@ -139,6 +143,16 @@ function renderKeys() {
     el.innerHTML = `<span>${k.slice(0,8)}...${k.slice(-4)}</span><button onclick="removeKey(${i})">✕</button>`;
     list.appendChild(el);
   });
+}
+
+function toggleJson() {
+  const box = document.getElementById('json-box');
+  if (box.style.display === 'none' || box.style.display === '') {
+    box.textContent = lastRawJson || 'No data yet';
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
 }
 
 window.onload = () => {
@@ -181,12 +195,13 @@ function resizeAndDraw() {
 }
 
 const COLORS = [
-  ['#4CAF5088','#4CAF50'],['#2196F388','#2196F3'],['#FF980088','#FF9800'],
-  ['#E91E6388','#E91E63'],['#9C27B088','#9C27B0'],['#00BCD488','#00BCD4'],
-  ['#FF572288','#FF5722'],['#607D8B88','#607D8B'],
+  ['#4CAF5066','#4CAF50'],['#2196F366','#2196F3'],['#FF980066','#FF9800'],
+  ['#E91E6366','#E91E63'],['#9C27B066','#9C27B0'],['#00BCD466','#00BCD4'],
+  ['#FF572266','#FF5722'],['#607D8B66','#607D8B'],
 ];
 
 function draw() {
+  if (!img) return;
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   const scaleX = canvas.width / imgNaturalW;
@@ -195,17 +210,17 @@ function draw() {
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   rooms.forEach((room, i) => {
     const pts = room.smoothed;
-    if (pts.length < 3) return;
+    if (!pts || pts.length < 3) return;
     const [fill, stroke] = COLORS[i % COLORS.length];
     const isSelected = selectedIndex === i;
     ctx.beginPath();
     ctx.moveTo(pts[0][0] * scaleX, pts[0][1] * scaleY);
     for (let j = 1; j < pts.length; j++) ctx.lineTo(pts[j][0] * scaleX, pts[j][1] * scaleY);
     ctx.closePath();
-    ctx.fillStyle = isSelected ? fill.replace('88','bb') : fill;
+    ctx.fillStyle = isSelected ? fill.replace('66','cc') : fill;
     ctx.fill();
     ctx.strokeStyle = stroke;
-    ctx.lineWidth = isSelected ? 3 : 1.5;
+    ctx.lineWidth = isSelected ? 3 : 2;
     ctx.stroke();
     if (showLabels) {
       const cx = pts.reduce((s,p) => s+p[0], 0) / pts.length * scaleX;
@@ -249,12 +264,29 @@ function douglasPeucker(points, epsilon) {
   return [points[0], points[points.length-1]];
 }
 
-async function tryRequest(apiKey, model, body) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
-  );
-  return res;
+function parseGeminiResponse(text) {
+  let cleaned = text.replace(/```json|```/g, '').trim();
+  try { return JSON.parse(cleaned); } catch(e) {}
+  // Try to fix truncated JSON - find last complete room entry
+  const match = cleaned.match(/([\s\S]*\])\s*\}\s*\]/);
+  if (match) {
+    try { return JSON.parse(match[1] + ']}'); } catch(e) {}
+  }
+  // Find rooms array start and try to close it
+  const start = cleaned.indexOf('{"rooms"');
+  if (start !== -1) {
+    let partial = cleaned.slice(start);
+    // Count open brackets to find where to close
+    let depth = 0, lastGood = 0;
+    for (let i = 0; i < partial.length; i++) {
+      if (partial[i] === '[') depth++;
+      if (partial[i] === ']') { depth--; if (depth === 0) lastGood = i; }
+    }
+    if (lastGood > 0) {
+      try { return JSON.parse(partial.slice(0, lastGood+1) + ']}'); } catch(e) {}
+    }
+  }
+  throw new Error('Could not parse JSON response');
 }
 
 async function detectRooms() {
@@ -262,6 +294,7 @@ async function detectRooms() {
   if (!img) { showError('Please load an image first'); return; }
 
   document.getElementById('error-box').style.display = 'none';
+  document.getElementById('json-box').style.display = 'none';
   const btn = document.getElementById('detect-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Analyzing...';
@@ -271,12 +304,11 @@ async function detectRooms() {
   canvas.getContext('2d').drawImage(img, 0, 0);
   const base64 = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
 
-  const prompt = `You are analyzing a floor plan image of size ${imgNaturalW}x${imgNaturalH} pixels.
-Find ALL rooms and enclosed spaces. For each room return a polygon tracing its boundary.
-Use pixel coordinates (0,0 is top-left).
-Return ONLY valid JSON, no markdown, no backticks:
+  const prompt = `Analyze this floor plan (${imgNaturalW}x${imgNaturalH} px). Find ALL rooms.
+For each room return polygon points tracing its walls in pixel coordinates (0,0 = top-left).
+Return ONLY valid JSON, no markdown:
 {"rooms":[{"name":"Room name","polygon":[[x1,y1],[x2,y2],...]}]}
-Rules: follow actual walls, at least 4 points per room, coordinates within image bounds, close each polygon.`;
+Use at least 4 points per room. Stay within image bounds.`;
 
   const body = JSON.stringify({
     contents: [{ parts: [
@@ -286,13 +318,16 @@ Rules: follow actual walls, at least 4 points per room, coordinates within image
     generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
   });
 
-  let lastRawJson = null, lastError = '';
+  let lastError = '';
 
   for (const apiKey of apiKeys) {
     for (const model of MODELS) {
-      setStatus(`Trying ${model} with key ...${apiKey.slice(-4)}`);
+      setStatus(`Trying ${model} (key ...${apiKey.slice(-4)})`);
       try {
-        const res = await tryRequest(apiKey, model, body);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+        );
         if (res.status === 429 || res.status === 503) {
           lastError = `key ...${apiKey.slice(-4)} / ${model}: quota exceeded`;
           continue;
@@ -303,9 +338,9 @@ Rules: follow actual walls, at least 4 points per room, coordinates within image
         }
         const data = await res.json();
         const text = data.candidates[0].content.parts[0].text;
-        const cleaned = text.replace(/```json|```/g, '').trim().replace(/,s*$/, ''); let parsed; try { parsed = JSON.parse(cleaned); } catch(e) { const fixed = cleaned.replace(/[s*$/, '').replace(/,s*$/, '') + ']}]}'; try { parsed = JSON.parse(fixed); } catch(e2) { throw new Error('JSON parse failed: ' + e2.message); } }
-        const parsed = JSON.parse(cleaned);
-        lastRawJson = JSON.stringify(parsed, null, 2); const epsilon = parseFloat(document.getElementById('smoothing').value);
+        lastRawJson = text;
+        const parsed = parseGeminiResponse(text);
+        const epsilon = parseFloat(document.getElementById('smoothing').value);
         rooms = parsed.rooms.map(r => ({
           name: r.name,
           polygon: r.polygon,
@@ -345,14 +380,3 @@ window.addEventListener('resize', () => { if (img) resizeAndDraw(); });
 </script>
 </body>
 </html>
-<script>
-function toggleJson() {
-  const box = document.getElementById('json-box');
-  if (box.style.display === 'none') {
-    box.textContent = lastRawJson || 'No data yet';
-    box.style.display = 'block';
-  } else {
-    box.style.display = 'none';
-  }
-}
-</script>
