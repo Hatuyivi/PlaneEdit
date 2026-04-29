@@ -11,15 +11,23 @@
   header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
   header span { font-size: 12px; color: #ffffff40; }
   .main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 24px 16px; gap: 20px; }
-  .api-section { width: 100%; max-width: 600px; background: #1a1d27; border-radius: 12px; padding: 20px; display: flex; gap: 10px; }
-  .api-section input { flex: 1; background: #ffffff10; border: 1px solid #ffffff20; border-radius: 8px; padding: 10px 14px; color: #fff; font-size: 14px; outline: none; }
-  .api-section input:focus { border-color: #4f8ef7; }
-  .api-section input::placeholder { color: #ffffff30; }
+  .api-section { width: 100%; max-width: 600px; background: #1a1d27; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .api-section h3 { font-size: 13px; color: #ffffff60; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+  .api-row { display: flex; gap: 8px; align-items: center; }
+  .api-row input { flex: 1; background: #ffffff10; border: 1px solid #ffffff20; border-radius: 8px; padding: 10px 14px; color: #fff; font-size: 14px; outline: none; }
+  .api-row input:focus { border-color: #4f8ef7; }
+  .api-row input::placeholder { color: #ffffff30; }
+  .api-list { display: flex; flex-direction: column; gap: 6px; }
+  .api-item { display: flex; align-items: center; gap: 8px; background: #ffffff08; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #ffffff80; font-family: monospace; }
+  .api-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .api-item button { background: none; border: none; color: #ffffff30; cursor: pointer; font-size: 16px; padding: 0 4px; }
+  .api-item button:hover { color: #ff6b6b; }
   .btn { background: #4f8ef7; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
   .btn:hover { opacity: 0.85; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-outline { background: transparent; border: 1px solid #ffffff30; color: #ffffff80; }
   .btn-outline:hover { border-color: #ffffff60; opacity: 1; }
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
   .canvas-section { width: 100%; max-width: 900px; position: relative; }
   .drop-zone { width: 100%; aspect-ratio: 4/3; max-height: 500px; background: #1a1d27; border: 2px dashed #ffffff15; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: border-color 0.2s; }
   .drop-zone:hover { border-color: #4f8ef7; }
@@ -52,8 +60,12 @@
 
 <div class="main">
   <div class="api-section">
-    <input type="password" id="api-key" placeholder="Gemini API key (AIza...)" />
-    <button class="btn btn-outline" onclick="saveKey()">Save</button>
+    <h3>API Keys</h3>
+    <div class="api-row">
+      <input type="password" id="api-key-input" placeholder="Add Gemini API key (AIza...)" />
+      <button class="btn btn-sm" onclick="addKey()">Add</button>
+    </div>
+    <div class="api-list" id="api-list"></div>
   </div>
 
   <div class="canvas-section">
@@ -86,31 +98,51 @@
 </div>
 
 <script>
-const MODELS = [
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-8b',
-  'gemini-1.5-pro',
-];
+const MODELS = ['gemini-2.5-flash-preview-05-20', 'gemini-2.5-flash-lite'];
 
-const COLORS = [
-  ['#4CAF5088','#4CAF50'],['#2196F388','#2196F3'],['#FF980088','#FF9800'],
-  ['#E91E6388','#E91E63'],['#9C27B088','#9C27B0'],['#00BCD488','#00BCD4'],
-  ['#FF572288','#FF5722'],['#607D8B88','#607D8B'],
-];
-
+let apiKeys = [];
 let img = null, rooms = [], selectedIndex = null, showLabels = true;
 let imgNaturalW = 0, imgNaturalH = 0;
 
-function saveKey() {
-  localStorage.setItem('gemini_key', document.getElementById('api-key').value.trim());
-  setStatus('API key saved ✓');
+function loadKeys() {
+  try { apiKeys = JSON.parse(localStorage.getItem('gemini_keys') || '[]'); } catch { apiKeys = []; }
+  renderKeys();
+}
+
+function saveKeys() {
+  localStorage.setItem('gemini_keys', JSON.stringify(apiKeys));
+}
+
+function addKey() {
+  const input = document.getElementById('api-key-input');
+  const key = input.value.trim();
+  if (!key) return;
+  if (apiKeys.includes(key)) { input.value = ''; return; }
+  apiKeys.push(key);
+  saveKeys();
+  renderKeys();
+  input.value = '';
+}
+
+function removeKey(i) {
+  apiKeys.splice(i, 1);
+  saveKeys();
+  renderKeys();
+}
+
+function renderKeys() {
+  const list = document.getElementById('api-list');
+  list.innerHTML = '';
+  apiKeys.forEach((k, i) => {
+    const el = document.createElement('div');
+    el.className = 'api-item';
+    el.innerHTML = `<span>${k.slice(0,8)}...${k.slice(-4)}</span><button onclick="removeKey(${i})">✕</button>`;
+    list.appendChild(el);
+  });
 }
 
 window.onload = () => {
-  const k = localStorage.getItem('gemini_key');
-  if (k) document.getElementById('api-key').value = k;
-
+  loadKeys();
   const dz = document.getElementById('drop-zone');
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor='#4f8ef7'; });
   dz.addEventListener('dragleave', () => { dz.style.borderColor=''; });
@@ -148,21 +180,24 @@ function resizeAndDraw() {
   draw();
 }
 
+const COLORS = [
+  ['#4CAF5088','#4CAF50'],['#2196F388','#2196F3'],['#FF980088','#FF9800'],
+  ['#E91E6388','#E91E63'],['#9C27B088','#9C27B0'],['#00BCD488','#00BCD4'],
+  ['#FF572288','#FF5722'],['#607D8B88','#607D8B'],
+];
+
 function draw() {
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   const scaleX = canvas.width / imgNaturalW;
   const scaleY = canvas.height / imgNaturalH;
-
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
   rooms.forEach((room, i) => {
     const pts = room.smoothed;
     if (pts.length < 3) return;
     const [fill, stroke] = COLORS[i % COLORS.length];
     const isSelected = selectedIndex === i;
-
     ctx.beginPath();
     ctx.moveTo(pts[0][0] * scaleX, pts[0][1] * scaleY);
     for (let j = 1; j < pts.length; j++) ctx.lineTo(pts[j][0] * scaleX, pts[j][1] * scaleY);
@@ -172,7 +207,6 @@ function draw() {
     ctx.strokeStyle = stroke;
     ctx.lineWidth = isSelected ? 3 : 1.5;
     ctx.stroke();
-
     if (showLabels) {
       const cx = pts.reduce((s,p) => s+p[0], 0) / pts.length * scaleX;
       const cy = pts.reduce((s,p) => s+p[1], 0) / pts.length * scaleY;
@@ -191,20 +225,10 @@ function draw() {
 }
 
 function redraw() { if (img) draw(); }
-
 function toggleLabels() { showLabels = !showLabels; draw(); }
-
-function clearRooms() {
-  rooms = []; selectedIndex = null;
-  document.getElementById('rooms-row').innerHTML = '';
-  draw();
-}
-
+function clearRooms() { rooms = []; selectedIndex = null; document.getElementById('rooms-row').innerHTML = ''; draw(); }
 function setStatus(msg) { document.getElementById('status').textContent = msg; }
-function showError(msg) {
-  const el = document.getElementById('error-box');
-  el.textContent = msg; el.style.display = 'block';
-}
+function showError(msg) { const el = document.getElementById('error-box'); el.textContent = msg; el.style.display = 'block'; }
 
 function douglasPeucker(points, epsilon) {
   if (points.length < 3) return points;
@@ -225,9 +249,16 @@ function douglasPeucker(points, epsilon) {
   return [points[0], points[points.length-1]];
 }
 
+async function tryRequest(apiKey, model, body) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+  );
+  return res;
+}
+
 async function detectRooms() {
-  const apiKey = document.getElementById('api-key').value.trim();
-  if (!apiKey) { showError('Please enter your Gemini API key'); return; }
+  if (apiKeys.length === 0) { showError('Add at least one Gemini API key'); return; }
   if (!img) { showError('Please load an image first'); return; }
 
   document.getElementById('error-box').style.display = 'none';
@@ -256,45 +287,43 @@ Rules: follow actual walls, at least 4 points per room, coordinates within image
   });
 
   let lastError = '';
-  for (const model of MODELS) {
-    setStatus(`Trying ${model}...`);
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
-      );
-      if (res.status === 429 || res.status === 503) {
-        lastError = `${model}: rate limit (${res.status})`;
-        continue;
-      }
-      if (!res.ok) {
-        lastError = `${model}: error ${res.status}`;
-        continue;
-      }
-      const data = await res.json();
-      const text = data.candidates[0].content.parts[0].text;
-      const cleaned = text.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
-      const epsilon = parseFloat(document.getElementById('smoothing').value);
 
-      rooms = parsed.rooms.map(r => ({
-        name: r.name,
-        polygon: r.polygon,
-        smoothed: douglasPeucker(r.polygon, epsilon)
-      }));
-
-      renderChips();
-      draw();
-      setStatus(`Found ${rooms.length} rooms using ${model}`);
-      btn.disabled = false;
-      btn.innerHTML = '✨ Detect Rooms';
-      return;
-    } catch(e) {
-      lastError = `${model}: ${e.message}`;
+  for (const apiKey of apiKeys) {
+    for (const model of MODELS) {
+      setStatus(`Trying ${model} with key ...${apiKey.slice(-4)}`);
+      try {
+        const res = await tryRequest(apiKey, model, body);
+        if (res.status === 429 || res.status === 503) {
+          lastError = `key ...${apiKey.slice(-4)} / ${model}: quota exceeded`;
+          continue;
+        }
+        if (!res.ok) {
+          lastError = `key ...${apiKey.slice(-4)} / ${model}: error ${res.status}`;
+          continue;
+        }
+        const data = await res.json();
+        const text = data.candidates[0].content.parts[0].text;
+        const cleaned = text.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        const epsilon = parseFloat(document.getElementById('smoothing').value);
+        rooms = parsed.rooms.map(r => ({
+          name: r.name,
+          polygon: r.polygon,
+          smoothed: douglasPeucker(r.polygon, epsilon)
+        }));
+        renderChips();
+        draw();
+        setStatus(`Found ${rooms.length} rooms (${model}, key ...${apiKey.slice(-4)})`);
+        btn.disabled = false;
+        btn.innerHTML = '✨ Detect Rooms';
+        return;
+      } catch(e) {
+        lastError = `key ...${apiKey.slice(-4)} / ${model}: ${e.message}`;
+      }
     }
   }
 
-  showError('All models failed: ' + lastError);
+  showError('All keys and models failed. Last: ' + lastError);
   setStatus('');
   btn.disabled = false;
   btn.innerHTML = '✨ Detect Rooms';
