@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Floor Plan AI</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+  header { background: #1a1d27; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #ffffff10; }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+  header span { font-size: 12px; color: #ffffff40; }
+  .main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 24px 16px; gap: 20px; }
+  .api-section { width: 100%; max-width: 600px; background: #1a1d27; border-radius: 12px; padding: 20px; display: flex; gap: 10px; }
+  .api-section input { flex: 1; background: #ffffff10; border: 1px solid #ffffff20; border-radius: 8px; padding: 10px 14px; color: #fff; font-size: 14px; outline: none; }
+  .api-section input:focus { border-color: #4f8ef7; }
+  .api-section input::placeholder { color: #ffffff30; }
+  .btn { background: #4f8ef7; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-outline { background: transparent; border: 1px solid #ffffff30; color: #ffffff80; }
+  .btn-outline:hover { border-color: #ffffff60; opacity: 1; }
+  .canvas-section { width: 100%; max-width: 900px; position: relative; }
+  .drop-zone { width: 100%; aspect-ratio: 4/3; max-height: 500px; background: #1a1d27; border: 2px dashed #ffffff15; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: border-color 0.2s; }
+  .drop-zone:hover { border-color: #4f8ef7; }
+  .drop-zone svg { opacity: 0.2; }
+  .drop-zone p { color: #ffffff38; font-size: 15px; }
+  .drop-zone small { color: #ffffff25; font-size: 12px; }
+  #canvas-wrapper { position: relative; display: none; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px #00000066; }
+  canvas { display: block; max-width: 100%; }
+  .controls { width: 100%; max-width: 900px; background: #1a1d27; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .slider-row { display: flex; align-items: center; gap: 12px; }
+  .slider-row label { font-size: 13px; color: #ffffff60; min-width: 80px; }
+  .slider-row input[type=range] { flex: 1; accent-color: #4f8ef7; }
+  .slider-row span { font-size: 13px; color: #ffffff60; min-width: 30px; text-align: right; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .rooms-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { padding: 6px 14px; border-radius: 20px; background: #ffffff10; border: 1px solid #ffffff15; color: #ffffff60; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+  .chip.active { background: #4f8ef7; border-color: #4f8ef7; color: #fff; font-weight: 600; }
+  .error { background: #ff000020; border: 1px solid #ff000040; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #ff6b6b; }
+  .status { font-size: 13px; color: #ffffff50; text-align: center; }
+  #file-input { display: none; }
+  .spinner { width: 16px; height: 16px; border: 2px solid #ffffff40; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏠 Floor Plan AI</h1>
+  <span>Powered by Gemini</span>
+</header>
+
+<div class="main">
+  <div class="api-section">
+    <input type="password" id="api-key" placeholder="Gemini API key (AIza...)" />
+    <button class="btn btn-outline" onclick="saveKey()">Save</button>
+  </div>
+
+  <div class="canvas-section">
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      <p>Click or drop a floor plan image</p>
+      <small>PNG, JPG supported</small>
+    </div>
+    <div id="canvas-wrapper">
+      <canvas id="canvas"></canvas>
+    </div>
+    <input type="file" id="file-input" accept="image/png,image/jpeg" onchange="loadImage(event)" />
+  </div>
+
+  <div class="controls" id="controls" style="display:none">
+    <div class="slider-row">
+      <label>Smoothing</label>
+      <input type="range" id="smoothing" min="0.5" max="10" step="0.5" value="3" oninput="document.getElementById('smooth-val').textContent=this.value; redraw()" />
+      <span id="smooth-val">3</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="detect-btn" onclick="detectRooms()">✨ Detect Rooms</button>
+      <button class="btn btn-outline" onclick="toggleLabels()">Toggle Labels</button>
+      <button class="btn btn-outline" onclick="clearRooms()">Clear</button>
+    </div>
+    <div id="rooms-row" class="rooms-row"></div>
+    <div id="error-box" style="display:none" class="error"></div>
+    <div id="status" class="status"></div>
+  </div>
+</div>
+
+<script>
+const MODELS = [
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
+  'gemini-1.5-pro',
+];
+
+const COLORS = [
+  ['#4CAF5088','#4CAF50'],['#2196F388','#2196F3'],['#FF980088','#FF9800'],
+  ['#E91E6388','#E91E63'],['#9C27B088','#9C27B0'],['#00BCD488','#00BCD4'],
+  ['#FF572288','#FF5722'],['#607D8B88','#607D8B'],
+];
+
+let img = null, rooms = [], selectedIndex = null, showLabels = true;
+let imgNaturalW = 0, imgNaturalH = 0;
+
+function saveKey() {
+  localStorage.setItem('gemini_key', document.getElementById('api-key').value.trim());
+  setStatus('API key saved ✓');
+}
+
+window.onload = () => {
+  const k = localStorage.getItem('gemini_key');
+  if (k) document.getElementById('api-key').value = k;
+
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor='#4f8ef7'; });
+  dz.addEventListener('dragleave', () => { dz.style.borderColor=''; });
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.style.borderColor=''; const f = e.dataTransfer.files[0]; if(f) loadFile(f); });
+};
+
+function loadImage(e) { loadFile(e.target.files[0]); }
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    img = new Image();
+    img.onload = () => {
+      imgNaturalW = img.naturalWidth;
+      imgNaturalH = img.naturalHeight;
+      rooms = []; selectedIndex = null;
+      document.getElementById('drop-zone').style.display = 'none';
+      document.getElementById('canvas-wrapper').style.display = 'block';
+      document.getElementById('controls').style.display = 'flex';
+      document.getElementById('rooms-row').innerHTML = '';
+      document.getElementById('error-box').style.display = 'none';
+      resizeAndDraw();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function resizeAndDraw() {
+  const canvas = document.getElementById('canvas');
+  const maxW = Math.min(900, window.innerWidth - 32);
+  const scale = Math.min(1, maxW / imgNaturalW);
+  canvas.width = imgNaturalW * scale;
+  canvas.height = imgNaturalH * scale;
+  draw();
+}
+
+function draw() {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const scaleX = canvas.width / imgNaturalW;
+  const scaleY = canvas.height / imgNaturalH;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  rooms.forEach((room, i) => {
+    const pts = room.smoothed;
+    if (pts.length < 3) return;
+    const [fill, stroke] = COLORS[i % COLORS.length];
+    const isSelected = selectedIndex === i;
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0] * scaleX, pts[0][1] * scaleY);
+    for (let j = 1; j < pts.length; j++) ctx.lineTo(pts[j][0] * scaleX, pts[j][1] * scaleY);
+    ctx.closePath();
+    ctx.fillStyle = isSelected ? fill.replace('88','bb') : fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = isSelected ? 3 : 1.5;
+    ctx.stroke();
+
+    if (showLabels) {
+      const cx = pts.reduce((s,p) => s+p[0], 0) / pts.length * scaleX;
+      const cy = pts.reduce((s,p) => s+p[1], 0) / pts.length * scaleY;
+      ctx.font = 'bold 12px -apple-system, sans-serif';
+      const tw = ctx.measureText(room.name).width;
+      ctx.fillStyle = stroke + 'dd';
+      ctx.beginPath();
+      ctx.roundRect(cx - tw/2 - 5, cy - 10, tw + 10, 20, 4);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(room.name, cx, cy);
+    }
+  });
+}
+
+function redraw() { if (img) draw(); }
+
+function toggleLabels() { showLabels = !showLabels; draw(); }
+
+function clearRooms() {
+  rooms = []; selectedIndex = null;
+  document.getElementById('rooms-row').innerHTML = '';
+  draw();
+}
+
+function setStatus(msg) { document.getElementById('status').textContent = msg; }
+function showError(msg) {
+  const el = document.getElementById('error-box');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function douglasPeucker(points, epsilon) {
+  if (points.length < 3) return points;
+  let maxDist = 0, maxIdx = 0;
+  const [x1,y1] = points[0], [x2,y2] = points[points.length-1];
+  const dx = x2-x1, dy = y2-y1, len = Math.sqrt(dx*dx+dy*dy);
+  for (let i = 1; i < points.length-1; i++) {
+    const [px,py] = points[i];
+    const dist = len === 0 ? Math.sqrt((px-x1)**2+(py-y1)**2)
+      : Math.abs(dy*px - dx*py + x2*y1 - y2*x1) / len;
+    if (dist > maxDist) { maxDist = dist; maxIdx = i; }
+  }
+  if (maxDist > epsilon) {
+    const l = douglasPeucker(points.slice(0, maxIdx+1), epsilon);
+    const r = douglasPeucker(points.slice(maxIdx), epsilon);
+    return [...l.slice(0,-1), ...r];
+  }
+  return [points[0], points[points.length-1]];
+}
+
+async function detectRooms() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (!apiKey) { showError('Please enter your Gemini API key'); return; }
+  if (!img) { showError('Please load an image first'); return; }
+
+  document.getElementById('error-box').style.display = 'none';
+  const btn = document.getElementById('detect-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Analyzing...';
+
+  const canvas = document.createElement('canvas');
+  canvas.width = imgNaturalW; canvas.height = imgNaturalH;
+  canvas.getContext('2d').drawImage(img, 0, 0);
+  const base64 = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
+
+  const prompt = `You are analyzing a floor plan image of size ${imgNaturalW}x${imgNaturalH} pixels.
+Find ALL rooms and enclosed spaces. For each room return a polygon tracing its boundary.
+Use pixel coordinates (0,0 is top-left).
+Return ONLY valid JSON, no markdown, no backticks:
+{"rooms":[{"name":"Room name","polygon":[[x1,y1],[x2,y2],...]}]}
+Rules: follow actual walls, at least 4 points per room, coordinates within image bounds, close each polygon.`;
+
+  const body = JSON.stringify({
+    contents: [{ parts: [
+      { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+      { text: prompt }
+    ]}],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+  });
+
+  let lastError = '';
+  for (const model of MODELS) {
+    setStatus(`Trying ${model}...`);
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+      );
+      if (res.status === 429 || res.status === 503) {
+        lastError = `${model}: rate limit (${res.status})`;
+        continue;
+      }
+      if (!res.ok) {
+        lastError = `${model}: error ${res.status}`;
+        continue;
+      }
+      const data = await res.json();
+      const text = data.candidates[0].content.parts[0].text;
+      const cleaned = text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      const epsilon = parseFloat(document.getElementById('smoothing').value);
+
+      rooms = parsed.rooms.map(r => ({
+        name: r.name,
+        polygon: r.polygon,
+        smoothed: douglasPeucker(r.polygon, epsilon)
+      }));
+
+      renderChips();
+      draw();
+      setStatus(`Found ${rooms.length} rooms using ${model}`);
+      btn.disabled = false;
+      btn.innerHTML = '✨ Detect Rooms';
+      return;
+    } catch(e) {
+      lastError = `${model}: ${e.message}`;
+    }
+  }
+
+  showError('All models failed: ' + lastError);
+  setStatus('');
+  btn.disabled = false;
+  btn.innerHTML = '✨ Detect Rooms';
+}
+
+function renderChips() {
+  const row = document.getElementById('rooms-row');
+  row.innerHTML = '';
+  rooms.forEach((r, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (selectedIndex === i ? ' active' : '');
+    chip.textContent = r.name;
+    chip.onclick = () => { selectedIndex = selectedIndex === i ? null : i; renderChips(); draw(); };
+    row.appendChild(chip);
+  });
+}
+
+window.addEventListener('resize', () => { if (img) resizeAndDraw(); });
+</script>
+</body>
+</html>
