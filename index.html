@@ -89,11 +89,11 @@
     <div class="btn-row">
       <button class="btn" id="detect-btn" onclick="detectRooms()">✨ Detect Rooms</button>
       <button class="btn btn-outline" onclick="toggleLabels()">Toggle Labels</button>
-      <button class="btn btn-outline" onclick="clearRooms()">Clear</button>
+      <button class="btn btn-outline" onclick="clearRooms()">Clear</button><button class="btn btn-outline" onclick="toggleJson()">Show JSON</button>
     </div>
     <div id="rooms-row" class="rooms-row"></div>
     <div id="error-box" style="display:none" class="error"></div>
-    <div id="status" class="status"></div>
+    <pre id="json-box" style="display:none;background:#ffffff08;border-radius:8px;padding:12px;font-size:11px;color:#ffffffaa;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto"></pre><div id="status" class="status"></div>
   </div>
 </div>
 
@@ -286,7 +286,7 @@ Rules: follow actual walls, at least 4 points per room, coordinates within image
     generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
   });
 
-  let lastError = '';
+  let lastRawJson = null, lastError = '';
 
   for (const apiKey of apiKeys) {
     for (const model of MODELS) {
@@ -305,7 +305,7 @@ Rules: follow actual walls, at least 4 points per room, coordinates within image
         const text = data.candidates[0].content.parts[0].text;
         const cleaned = text.replace(/```json|```/g, '').trim();
         const parsed = JSON.parse(cleaned);
-        const epsilon = parseFloat(document.getElementById('smoothing').value);
+        lastRawJson = JSON.stringify(parsed, null, 2); const epsilon = parseFloat(document.getElementById('smoothing').value);
         rooms = parsed.rooms.map(r => ({
           name: r.name,
           polygon: r.polygon,
@@ -345,3 +345,14 @@ window.addEventListener('resize', () => { if (img) resizeAndDraw(); });
 </script>
 </body>
 </html>
+<script>
+function toggleJson() {
+  const box = document.getElementById('json-box');
+  if (box.style.display === 'none') {
+    box.textContent = lastRawJson || 'No data yet';
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+</script>
