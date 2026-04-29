@@ -4,41 +4,42 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Floor Plan AI</title>
+<script async src="https://docs.opencv.org/4.8.0/opencv.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0f1117; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
   header { background: #1a1d27; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #ffffff10; }
-  header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+  header h1 { font-size: 20px; font-weight: 700; }
   header span { font-size: 12px; color: #ffffff40; }
   .main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 24px 16px; gap: 20px; }
   .api-section { width: 100%; max-width: 600px; background: #1a1d27; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
   .api-section h3 { font-size: 13px; color: #ffffff60; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
-  .api-row { display: flex; gap: 8px; align-items: center; }
+  .api-row { display: flex; gap: 8px; }
   .api-row input { flex: 1; background: #ffffff10; border: 1px solid #ffffff20; border-radius: 8px; padding: 10px 14px; color: #fff; font-size: 14px; outline: none; }
   .api-row input:focus { border-color: #4f8ef7; }
   .api-row input::placeholder { color: #ffffff30; }
   .api-list { display: flex; flex-direction: column; gap: 6px; }
   .api-item { display: flex; align-items: center; gap: 8px; background: #ffffff08; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #ffffff80; font-family: monospace; }
   .api-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .api-item button { background: none; border: none; color: #ffffff30; cursor: pointer; font-size: 16px; padding: 0 4px; }
+  .api-item button { background: none; border: none; color: #ffffff30; cursor: pointer; font-size: 16px; }
   .api-item button:hover { color: #ff6b6b; }
   .btn { background: #4f8ef7; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
   .btn:hover { opacity: 0.85; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-outline { background: transparent; border: 1px solid #ffffff30; color: #ffffff80; }
-  .btn-outline:hover { border-color: #ffffff60; opacity: 1; }
+  .btn-outline:hover { border-color: #ffffff60; }
   .btn-sm { padding: 6px 12px; font-size: 13px; }
-  .canvas-section { width: 100%; max-width: 900px; position: relative; }
+  .canvas-section { width: 100%; max-width: 900px; }
   .drop-zone { width: 100%; aspect-ratio: 4/3; max-height: 500px; background: #1a1d27; border: 2px dashed #ffffff15; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: border-color 0.2s; }
   .drop-zone:hover { border-color: #4f8ef7; }
   .drop-zone svg { opacity: 0.2; }
   .drop-zone p { color: #ffffff38; font-size: 15px; }
   .drop-zone small { color: #ffffff25; font-size: 12px; }
-  #canvas-wrapper { position: relative; display: none; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px #00000066; }
+  #canvas-wrapper { display: none; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px #00000066; }
   canvas { display: block; max-width: 100%; }
   .controls { width: 100%; max-width: 900px; background: #1a1d27; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
   .slider-row { display: flex; align-items: center; gap: 12px; }
-  .slider-row label { font-size: 13px; color: #ffffff60; min-width: 80px; }
+  .slider-row label { font-size: 13px; color: #ffffff60; min-width: 100px; }
   .slider-row input[type=range] { flex: 1; accent-color: #4f8ef7; }
   .slider-row span { font-size: 13px; color: #ffffff60; min-width: 30px; text-align: right; }
   .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -50,15 +51,13 @@
   #file-input { display: none; }
   .spinner { width: 16px; height: 16px; border: 2px solid #ffffff40; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  #json-box { display:none; background:#ffffff08; border-radius:8px; padding:12px; font-size:11px; color:#ffffffaa; white-space:pre-wrap; word-break:break-all; max-height:300px; overflow-y:auto; font-family:monospace; }
 </style>
 </head>
 <body>
 <header>
   <h1>🏠 Floor Plan AI</h1>
-  <span>Powered by Gemini</span>
+  <span>Gemini + OpenCV</span>
 </header>
-
 <div class="main">
   <div class="api-section">
     <h3>API Keys</h3>
@@ -75,9 +74,7 @@
       <p>Click or drop a floor plan image</p>
       <small>PNG, JPG supported</small>
     </div>
-    <div id="canvas-wrapper">
-      <canvas id="canvas"></canvas>
-    </div>
+    <div id="canvas-wrapper"><canvas id="canvas"></canvas></div>
     <input type="file" id="file-input" accept="image/png,image/jpeg" onchange="loadImage(event)" />
   </div>
 
@@ -87,14 +84,17 @@
       <input type="range" id="smoothing" min="0.5" max="10" step="0.5" value="3" oninput="document.getElementById('smooth-val').textContent=this.value; redraw()" />
       <span id="smooth-val">3</span>
     </div>
+    <div class="slider-row">
+      <label>CV Threshold</label>
+      <input type="range" id="threshold" min="50" max="200" step="5" value="100" oninput="document.getElementById('thresh-val').textContent=this.value" />
+      <span id="thresh-val">100</span>
+    </div>
     <div class="btn-row">
       <button class="btn" id="detect-btn" onclick="detectRooms()">✨ Detect Rooms</button>
-      <button class="btn btn-outline" onclick="toggleLabels()">Toggle Labels</button>
+      <button class="btn btn-outline" onclick="toggleLabels()">Labels</button>
       <button class="btn btn-outline" onclick="clearRooms()">Clear</button>
-      <button class="btn btn-outline" onclick="toggleJson()">Show JSON</button>
     </div>
     <div id="rooms-row" class="rooms-row"></div>
-    <div id="json-box"></div>
     <div id="error-box" style="display:none" class="error"></div>
     <div id="status" class="status"></div>
   </div>
@@ -102,38 +102,33 @@
 
 <script>
 const MODELS = ['gemini-2.5-flash-preview-05-20', 'gemini-2.5-flash-lite'];
-
-let apiKeys = [];
-let img = null, rooms = [], selectedIndex = null, showLabels = true;
+let apiKeys = [], img = null, rooms = [], selectedIndex = null, showLabels = true;
 let imgNaturalW = 0, imgNaturalH = 0;
-let lastRawJson = null;
+let cvReady = false;
+
+// Wait for OpenCV
+function onOpenCvReady() { cvReady = true; setStatus('OpenCV ready'); setTimeout(() => setStatus(''), 2000); }
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof cv !== 'undefined' && cv.Mat) { cvReady = true; }
+  else {
+    const t = setInterval(() => {
+      if (typeof cv !== 'undefined' && cv.Mat) { cvReady = true; clearInterval(t); }
+    }, 200);
+  }
+});
 
 function loadKeys() {
   try { apiKeys = JSON.parse(localStorage.getItem('gemini_keys') || '[]'); } catch { apiKeys = []; }
   renderKeys();
 }
-
-function saveKeys() {
-  localStorage.setItem('gemini_keys', JSON.stringify(apiKeys));
-}
-
+function saveKeys() { localStorage.setItem('gemini_keys', JSON.stringify(apiKeys)); }
 function addKey() {
   const input = document.getElementById('api-key-input');
   const key = input.value.trim();
-  if (!key) return;
-  if (apiKeys.includes(key)) { input.value = ''; return; }
-  apiKeys.push(key);
-  saveKeys();
-  renderKeys();
-  input.value = '';
+  if (!key || apiKeys.includes(key)) { input.value = ''; return; }
+  apiKeys.push(key); saveKeys(); renderKeys(); input.value = '';
 }
-
-function removeKey(i) {
-  apiKeys.splice(i, 1);
-  saveKeys();
-  renderKeys();
-}
-
+function removeKey(i) { apiKeys.splice(i, 1); saveKeys(); renderKeys(); }
 function renderKeys() {
   const list = document.getElementById('api-list');
   list.innerHTML = '';
@@ -145,33 +140,21 @@ function renderKeys() {
   });
 }
 
-function toggleJson() {
-  const box = document.getElementById('json-box');
-  if (box.style.display === 'none' || box.style.display === '') {
-    box.textContent = lastRawJson || 'No data yet';
-    box.style.display = 'block';
-  } else {
-    box.style.display = 'none';
-  }
-}
-
 window.onload = () => {
   loadKeys();
   const dz = document.getElementById('drop-zone');
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor='#4f8ef7'; });
-  dz.addEventListener('dragleave', () => { dz.style.borderColor=''; });
-  dz.addEventListener('drop', e => { e.preventDefault(); dz.style.borderColor=''; const f = e.dataTransfer.files[0]; if(f) loadFile(f); });
+  dz.addEventListener('dragleave', () => dz.style.borderColor='');
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.style.borderColor=''; if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
 };
 
 function loadImage(e) { loadFile(e.target.files[0]); }
-
 function loadFile(file) {
   const reader = new FileReader();
   reader.onload = ev => {
     img = new Image();
     img.onload = () => {
-      imgNaturalW = img.naturalWidth;
-      imgNaturalH = img.naturalHeight;
+      imgNaturalW = img.naturalWidth; imgNaturalH = img.naturalHeight;
       rooms = []; selectedIndex = null;
       document.getElementById('drop-zone').style.display = 'none';
       document.getElementById('canvas-wrapper').style.display = 'block';
@@ -195,9 +178,10 @@ function resizeAndDraw() {
 }
 
 const COLORS = [
-  ['#4CAF5066','#4CAF50'],['#2196F366','#2196F3'],['#FF980066','#FF9800'],
-  ['#E91E6366','#E91E63'],['#9C27B066','#9C27B0'],['#00BCD466','#00BCD4'],
-  ['#FF572266','#FF5722'],['#607D8B66','#607D8B'],
+  ['rgba(76,175,80,0.35)','#4CAF50'],['rgba(33,150,243,0.35)','#2196F3'],
+  ['rgba(255,152,0,0.35)','#FF9800'],['rgba(233,30,99,0.35)','#E91E63'],
+  ['rgba(156,39,176,0.35)','#9C27B0'],['rgba(0,188,212,0.35)','#00BCD4'],
+  ['rgba(255,87,34,0.35)','#FF5722'],['rgba(96,125,139,0.35)','#607D8B'],
 ];
 
 function draw() {
@@ -209,31 +193,27 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   rooms.forEach((room, i) => {
-    const pts = room.smoothed;
+    const pts = room.polygon;
     if (!pts || pts.length < 3) return;
     const [fill, stroke] = COLORS[i % COLORS.length];
-    const isSelected = selectedIndex === i;
+    const sel = selectedIndex === i;
     ctx.beginPath();
     ctx.moveTo(pts[0][0] * scaleX, pts[0][1] * scaleY);
     for (let j = 1; j < pts.length; j++) ctx.lineTo(pts[j][0] * scaleX, pts[j][1] * scaleY);
     ctx.closePath();
-    ctx.fillStyle = isSelected ? fill.replace('66','cc') : fill;
+    ctx.fillStyle = sel ? fill.replace('0.35','0.6') : fill;
     ctx.fill();
     ctx.strokeStyle = stroke;
-    ctx.lineWidth = isSelected ? 3 : 2;
+    ctx.lineWidth = sel ? 3 : 2;
     ctx.stroke();
     if (showLabels) {
       const cx = pts.reduce((s,p) => s+p[0], 0) / pts.length * scaleX;
       const cy = pts.reduce((s,p) => s+p[1], 0) / pts.length * scaleY;
-      ctx.font = 'bold 12px -apple-system, sans-serif';
+      ctx.font = 'bold 11px -apple-system, sans-serif';
       const tw = ctx.measureText(room.name).width;
       ctx.fillStyle = stroke + 'dd';
-      ctx.beginPath();
-      ctx.roundRect(cx - tw/2 - 5, cy - 10, tw + 10, 20, 4);
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+      ctx.beginPath(); ctx.roundRect(cx-tw/2-5, cy-10, tw+10, 20, 4); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(room.name, cx, cy);
     }
   });
@@ -252,8 +232,7 @@ function douglasPeucker(points, epsilon) {
   const dx = x2-x1, dy = y2-y1, len = Math.sqrt(dx*dx+dy*dy);
   for (let i = 1; i < points.length-1; i++) {
     const [px,py] = points[i];
-    const dist = len === 0 ? Math.sqrt((px-x1)**2+(py-y1)**2)
-      : Math.abs(dy*px - dx*py + x2*y1 - y2*x1) / len;
+    const dist = len === 0 ? Math.sqrt((px-x1)**2+(py-y1)**2) : Math.abs(dy*px-dx*py+x2*y1-y2*x1)/len;
     if (dist > maxDist) { maxDist = dist; maxIdx = i; }
   }
   if (maxDist > epsilon) {
@@ -264,19 +243,68 @@ function douglasPeucker(points, epsilon) {
   return [points[0], points[points.length-1]];
 }
 
+// OpenCV: find best contour inside bounding box
+function findContourInBox(box, threshold) {
+  if (!cvReady || typeof cv === 'undefined') return null;
+  try {
+    const { x, y, w, h } = box;
+    const pad = 10;
+    const x0 = Math.max(0, x - pad), y0 = Math.max(0, y - pad);
+    const x1 = Math.min(imgNaturalW, x + w + pad), y1 = Math.min(imgNaturalH, y + h + pad);
+    const rw = x1 - x0, rh = y1 - y0;
+    if (rw < 10 || rh < 10) return null;
+
+    // Draw image region to temp canvas
+    const tmp = document.createElement('canvas');
+    tmp.width = rw; tmp.height = rh;
+    tmp.getContext('2d').drawImage(img, x0, y0, rw, rh, 0, 0, rw, rh);
+
+    const src = cv.imread(tmp);
+    const gray = new cv.Mat();
+    const blur = new cv.Mat();
+    const edges = new cv.Mat();
+    const contours = new cv.MatVector();
+    const hierarchy = new cv.Mat();
+
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+    cv.Canny(blur, edges, threshold * 0.5, threshold);
+    cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+    let bestContour = null, bestArea = 0;
+    for (let i = 0; i < contours.size(); i++) {
+      const cnt = contours.get(i);
+      const area = cv.contourArea(cnt);
+      if (area > bestArea) { bestArea = area; bestContour = cnt; }
+    }
+
+    let polygon = null;
+    if (bestContour && bestArea > 100) {
+      const approx = new cv.Mat();
+      cv.approxPolyDP(bestContour, approx, 3, true);
+      polygon = [];
+      for (let i = 0; i < approx.rows; i++) {
+        polygon.push([approx.data32S[i*2] + x0, approx.data32S[i*2+1] + y0]);
+      }
+      approx.delete();
+    }
+
+    src.delete(); gray.delete(); blur.delete(); edges.delete();
+    contours.delete(); hierarchy.delete();
+
+    return polygon && polygon.length >= 3 ? polygon : null;
+  } catch(e) {
+    console.error('OpenCV error:', e);
+    return null;
+  }
+}
+
 function parseGeminiResponse(text) {
   let cleaned = text.replace(/```json|```/g, '').trim();
   try { return JSON.parse(cleaned); } catch(e) {}
-  // Try to fix truncated JSON - find last complete room entry
-  const match = cleaned.match(/([\s\S]*\])\s*\}\s*\]/);
-  if (match) {
-    try { return JSON.parse(match[1] + ']}'); } catch(e) {}
-  }
-  // Find rooms array start and try to close it
   const start = cleaned.indexOf('{"rooms"');
   if (start !== -1) {
     let partial = cleaned.slice(start);
-    // Count open brackets to find where to close
     let depth = 0, lastGood = 0;
     for (let i = 0; i < partial.length; i++) {
       if (partial[i] === '[') depth++;
@@ -286,7 +314,7 @@ function parseGeminiResponse(text) {
       try { return JSON.parse(partial.slice(0, lastGood+1) + ']}'); } catch(e) {}
     }
   }
-  throw new Error('Could not parse JSON response');
+  throw new Error('Could not parse JSON');
 }
 
 async function detectRooms() {
@@ -294,7 +322,6 @@ async function detectRooms() {
   if (!img) { showError('Please load an image first'); return; }
 
   document.getElementById('error-box').style.display = 'none';
-  document.getElementById('json-box').style.display = 'none';
   const btn = document.getElementById('detect-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Analyzing...';
@@ -304,11 +331,11 @@ async function detectRooms() {
   canvas.getContext('2d').drawImage(img, 0, 0);
   const base64 = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
 
-  const prompt = `Analyze this floor plan (${imgNaturalW}x${imgNaturalH} px). Find ALL rooms.
-For each room return polygon points tracing its walls in pixel coordinates (0,0 = top-left).
+  const prompt = `Analyze this floor plan (${imgNaturalW}x${imgNaturalH} px).
+Find ALL rooms. For each room return a bounding box in pixel coordinates.
 Return ONLY valid JSON, no markdown:
-{"rooms":[{"name":"Room name","polygon":[[x1,y1],[x2,y2],...]}]}
-Use at least 4 points per room. Stay within image bounds.`;
+{"rooms":[{"name":"Room name","box":{"x":X,"y":Y,"w":W,"h":H}}]}
+x,y = top-left corner. w,h = width and height. Stay within image bounds.`;
 
   const body = JSON.stringify({
     contents: [{ parts: [
@@ -318,7 +345,7 @@ Use at least 4 points per room. Stay within image bounds.`;
     generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
   });
 
-  let lastError = '';
+  let lastError = '', parsed = null;
 
   for (const apiKey of apiKeys) {
     for (const model of MODELS) {
@@ -328,38 +355,48 @@ Use at least 4 points per room. Stay within image bounds.`;
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
         );
-        if (res.status === 429 || res.status === 503) {
-          lastError = `key ...${apiKey.slice(-4)} / ${model}: quota exceeded`;
-          continue;
-        }
-        if (!res.ok) {
-          lastError = `key ...${apiKey.slice(-4)} / ${model}: error ${res.status}`;
-          continue;
-        }
+        if (res.status === 429 || res.status === 503) { lastError = `${model}: quota`; continue; }
+        if (!res.ok) { lastError = `${model}: ${res.status}`; continue; }
         const data = await res.json();
         const text = data.candidates[0].content.parts[0].text;
-        lastRawJson = text;
-        const parsed = parseGeminiResponse(text);
-        const epsilon = parseFloat(document.getElementById('smoothing').value);
-        rooms = parsed.rooms.map(r => ({
-          name: r.name,
-          polygon: r.polygon,
-          smoothed: douglasPeucker(r.polygon, epsilon)
-        }));
-        renderChips();
-        draw();
-        setStatus(`Found ${rooms.length} rooms (${model}, key ...${apiKey.slice(-4)})`);
-        btn.disabled = false;
-        btn.innerHTML = '✨ Detect Rooms';
-        return;
-      } catch(e) {
-        lastError = `key ...${apiKey.slice(-4)} / ${model}: ${e.message}`;
-      }
+        parsed = parseGeminiResponse(text);
+        break;
+      } catch(e) { lastError = `${model}: ${e.message}`; }
     }
+    if (parsed) break;
   }
 
-  showError('All keys and models failed. Last: ' + lastError);
-  setStatus('');
+  if (!parsed) {
+    showError('All models failed: ' + lastError);
+    btn.disabled = false; btn.innerHTML = '✨ Detect Rooms';
+    return;
+  }
+
+  setStatus('Finding contours with OpenCV...');
+  const threshold = parseInt(document.getElementById('threshold').value);
+  const epsilon = parseFloat(document.getElementById('smoothing').value);
+
+  rooms = parsed.rooms.map(r => {
+    let polygon = null;
+    if (cvReady && r.box) {
+      polygon = findContourInBox(r.box, threshold);
+    }
+    // Fallback to bounding box rectangle if OpenCV failed
+    if (!polygon && r.box) {
+      const { x, y, w, h } = r.box;
+      polygon = [[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
+    }
+    // Fallback to polygon from Gemini
+    if (!polygon && r.polygon) {
+      polygon = r.polygon;
+    }
+    const smoothed = polygon ? douglasPeucker(polygon, epsilon) : polygon;
+    return { name: r.name, polygon: smoothed };
+  }).filter(r => r.polygon && r.polygon.length >= 3);
+
+  renderChips();
+  draw();
+  setStatus(`Found ${rooms.length} rooms`);
   btn.disabled = false;
   btn.innerHTML = '✨ Detect Rooms';
 }
