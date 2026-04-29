@@ -283,7 +283,7 @@ Rules: follow actual walls, at least 4 points per room, coordinates within image
       { inline_data: { mime_type: 'image/jpeg', data: base64 } },
       { text: prompt }
     ]}],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+    generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
   });
 
   let lastRawJson = null, lastError = '';
@@ -303,7 +303,7 @@ Rules: follow actual walls, at least 4 points per room, coordinates within image
         }
         const data = await res.json();
         const text = data.candidates[0].content.parts[0].text;
-        const cleaned = text.replace(/```json|```/g, '').trim();
+        const cleaned = text.replace(/```json|```/g, '').trim().replace(/,s*$/, ''); let parsed; try { parsed = JSON.parse(cleaned); } catch(e) { const fixed = cleaned.replace(/[s*$/, '').replace(/,s*$/, '') + ']}]}'; try { parsed = JSON.parse(fixed); } catch(e2) { throw new Error('JSON parse failed: ' + e2.message); } }
         const parsed = JSON.parse(cleaned);
         lastRawJson = JSON.stringify(parsed, null, 2); const epsilon = parseFloat(document.getElementById('smoothing').value);
         rooms = parsed.rooms.map(r => ({
